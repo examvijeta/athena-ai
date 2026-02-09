@@ -5,14 +5,16 @@ class GeminiService {
   final GenerativeModel _model;
   final String _apiKey;
 
+  static const String APP_VERSION = "v1.3.0-StrictGemini3";
+
   GeminiService(String apiKey)
     : _apiKey = apiKey,
       _model = GenerativeModel(
-        model: 'gemini-3.0-pro', // Using the hackathon model
+        model: 'gemini-3-flash-preview', // Strictly for Gemini 3 Hackathon
         apiKey: apiKey,
         generationConfig: GenerationConfig(
           temperature: 0.7,
-          maxOutputTokens: 256, // Keep responses short for real-time feel
+          maxOutputTokens: 256,
         ),
       );
 
@@ -20,30 +22,34 @@ class GeminiService {
     required Uint8List imageBytes,
     required String prompt,
   }) async {
-    try {
-      final content = [
-        Content.multi([TextPart(prompt), DataPart('image/jpeg', imageBytes)]),
-      ];
+    if (imageBytes.isEmpty) return "Camera error: No image data.";
 
-      final response = await _model.generateContent(content);
-      return response.text;
-    } catch (e) {
-      debugPrint('Gemini 3.0 Error: $e. Trying fallback...');
+    // Strictly Gemini 3 models as requested
+    final modelsToTry = ['gemini-3-flash-preview', 'gemini-3-pro-preview'];
+
+    String lastError = "";
+
+    for (var modelName in modelsToTry) {
       try {
-        final fallbackModel = GenerativeModel(
-          model: 'gemini-1.5-pro',
-          apiKey: _apiKey,
-        );
-        final content = [
+        debugPrint('[$APP_VERSION] Trying strict Gemini 3 model: $modelName');
+        final currentModel = GenerativeModel(model: modelName, apiKey: _apiKey);
+
+        final response = await currentModel.generateContent([
           Content.multi([TextPart(prompt), DataPart('image/jpeg', imageBytes)]),
-        ];
-        final response = await fallbackModel.generateContent(content);
-        return response.text;
-      } catch (e2) {
-        debugPrint('Fallback Error: $e2');
-        return "I'm having trouble seeing that. Can you try again?";
+        ]);
+
+        if (response.text != null) return response.text;
+      } catch (e) {
+        lastError = "[$modelName] ${e.toString().split('\n').first}";
+        debugPrint('Error with $modelName: $e');
+
+        if (e.toString().contains('API_KEY_INVALID')) {
+          return "Error: Invalid API Key.";
+        }
       }
     }
+
+    return "All Gemini 3 models failed. (App $APP_VERSION). Last error: $lastError\n\nNote: Ensure your API Key has Gemini 3 access in AI Studio.";
   }
 
   Stream<String> chatStream(List<Content> history) {

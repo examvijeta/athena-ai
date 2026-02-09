@@ -109,15 +109,16 @@ class _CameraScreenState extends State<CameraScreen>
     if (!_isActive) return;
     await _processFrame();
     if (_isActive) {
-      Future.delayed(const Duration(seconds: 5), _processFrameLoop);
+      Future.delayed(const Duration(seconds: 10), _processFrameLoop);
     }
   }
 
   Future<void> _processFrame() async {
     if (_isProcessing ||
         _controller == null ||
-        !_controller!.value.isInitialized)
+        !_controller!.value.isInitialized) {
       return;
+    }
 
     if (mounted) {
       setState(() {
